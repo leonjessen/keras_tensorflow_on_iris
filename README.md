@@ -76,7 +76,7 @@ nn_dat %>% head(3)
     ## 2       -1.14       -0.132        -1.34       -1.31        0. setosa     
     ## 3       -1.38        0.327        -1.39       -1.31        0. setosa
 
-Then, we split the iris data into a training and a test data set, setting aside 20% of the data for testing:
+Then, we split the iris data into a training and a test data set, setting aside 20% of the data for independent testing:
 
 ``` r
 test_f = 0.20
@@ -155,7 +155,7 @@ print(perf)
 ```
 
     ## $loss
-    ## [1] 0.2977438
+    ## [1] 0.1924191
     ## 
     ## $acc
     ## [1] 1
@@ -166,7 +166,8 @@ and we can visualise the confusion matrix like so:
 nn_dat %>% filter(partition == 'test') %>%
   mutate(class_num = factor(class_num),
          y_pred    = factor(predict_classes(model, x_test)),
-         Correct   = factor(ifelse(class_num == y_pred, "Yes", "No"))) %>% ggplot(aes(x = class_num, y = y_pred, colour = Correct)) +
+         Correct   = factor(ifelse(class_num == y_pred, "Yes", "No"))) %>%
+  ggplot(aes(x = class_num, y = y_pred, colour = Correct)) +
   geom_jitter() +
   scale_x_discrete(labels = levels(nn_dat$class_label)) +
   scale_y_discrete(labels = levels(nn_dat$class_label)) +
@@ -181,7 +182,7 @@ nn_dat %>% filter(partition == 'test') %>%
 
 ### Conclusion
 
-I hope this little post illustrated how easy it is to get started building artificial neural network using Keras and TensorFlow in R. With relative ease, we created a 3-class predictor with an accuracy of 100%. This was a basic minimal example. The network can be expanded to create Deep Learning networks and furhtermore, the entire TensorFlow API is available.
+I hope this little post illustrated how easy it is to get started building artificial neural network using Keras and TensorFlow in R. With relative ease, we created a 3-class predictor with an accuracy of 100% on an independent data set. This was a basic minimal example. The network can be expanded to create Deep Learning networks and furhtermore, the entire TensorFlow API is available.
 
 Enjoy and Happy Learning!
 
