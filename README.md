@@ -59,24 +59,25 @@ We start with slightly wrangling the iris data set by renaming and scaling the f
 
 ``` r
 nn_dat = iris %>% as_tibble %>%
-  mutate(sepal_length = scale(Sepal.Length),
-         sepal_width  = scale(Sepal.Width),
-         petal_length = scale(Petal.Length),
-         petal_width  = scale(Petal.Width),          
-         class_num    = as.numeric(Species) - 1,  # Yields 0, 1, 2
+  mutate(sepal_l_feat = scale(Sepal.Length),
+         sepal_w_feat = scale(Sepal.Width),
+         petal_l_feat = scale(Petal.Length),
+         petal_w_feat = scale(Petal.Width),          
+         class_num    = as.numeric(Species) - 1, # factor, so = 0, 1, 2
          class_label  = Species) %>%
-  select(sepal_length, sepal_width, petal_length, petal_width, class_num, class_label)
+  select(contains("feat"), class_num, class_label)
 nn_dat %>% head(3)
 ```
 
     ## # A tibble: 3 x 6
-    ##   sepal_length sepal_width petal_length petal_width class_num class_label
-    ##          <dbl>       <dbl>        <dbl>       <dbl>     <dbl> <fct>      
-    ## 1       -0.898       1.02         -1.34       -1.31        0. setosa     
-    ## 2       -1.14       -0.132        -1.34       -1.31        0. setosa     
-    ## 3       -1.38        0.327        -1.39       -1.31        0. setosa
+    ##   sepal_l_feat sepal_w_feat petal_l_feat petal_w_feat class_num
+    ##          <dbl>        <dbl>        <dbl>        <dbl>     <dbl>
+    ## 1       -0.898        1.02         -1.34        -1.31        0.
+    ## 2       -1.14        -0.132        -1.34        -1.31        0.
+    ## 3       -1.38         0.327        -1.39        -1.31        0.
+    ## # ... with 1 more variable: class_label <fct>
 
-Then, we split the iris data into a training and a test data set, setting aside 20% of the data for independent testing:
+Then, we split the iris data into a training and a test data set, setting aside 20% of the data for left out data partition, to be used for final performance evaluation:
 
 ``` r
 test_f = 0.20
@@ -87,12 +88,10 @@ nn_dat = nn_dat %>%
 Based on the partition, we can now create training and test data
 
 ``` r
-x_train = nn_dat %>% filter(partition == 'train') %>%
-  select(sepal_length, sepal_width, petal_length, petal_width) %>% as.matrix
+x_train = nn_dat %>% filter(partition == 'train') %>% select(contains("feat")) %>% as.matrix
 y_train = nn_dat %>% filter(partition == 'train') %>% pull(class_num) %>% to_categorical(3)
-x_test  = nn_dat %>% filter(partition == 'test') %>%
-  select(sepal_length, sepal_width, petal_length, petal_width) %>% as.matrix
-y_test  = nn_dat %>% filter(partition == 'test') %>% pull(class_num) %>% to_categorical(3)
+x_test  = nn_dat %>% filter(partition == 'test')  %>% select(contains("feat")) %>% as.matrix
+y_test  = nn_dat %>% filter(partition == 'test')  %>% pull(class_num) %>% to_categorical(3)
 ```
 
 ### Set Architecture
@@ -119,7 +118,7 @@ model %>% summary
     ## Non-trainable params: 0
     ## ___________________________________________________________________________
 
-Next, the architecture set in the model needs to be compiled:
+As expected we see 35 trainable parameters. Next, the architecture set in the model needs to be compiled:
 
 ``` r
 model %>% compile(
@@ -155,34 +154,48 @@ print(perf)
 ```
 
     ## $loss
-    ## [1] 0.1924191
+    ## [1] 0.3843208
     ## 
     ## $acc
     ## [1] 1
 
-and we can visualise the confusion matrix like so:
+Then we can augment the `nn_dat` for plotting:
 
 ``` r
-nn_dat %>% filter(partition == 'test') %>%
+plot_dat = nn_dat %>% filter(partition == 'test') %>%
   mutate(class_num = factor(class_num),
          y_pred    = factor(predict_classes(model, x_test)),
-         Correct   = factor(ifelse(class_num == y_pred, "Yes", "No"))) %>%
-  ggplot(aes(x = class_num, y = y_pred, colour = Correct)) +
+         Correct   = factor(ifelse(class_num == y_pred, "Yes", "No")))
+plot_dat %>% select(-contains("feat")) %>% head(3)
+```
+
+    ## # A tibble: 3 x 5
+    ##   class_num class_label partition y_pred Correct
+    ##   <fct>     <fct>       <chr>     <fct>  <fct>  
+    ## 1 0         setosa      test      0      Yes    
+    ## 2 0         setosa      test      0      Yes    
+    ## 3 0         setosa      test      0      Yes
+
+and lastly, we can visualise the confusion matrix like so:
+
+``` r
+title     = "Classification Performance of Artificial Neural Network"
+sub_title = str_c("Accuracy = ", round(perf$acc, 3) * 100, "%")
+x_lab     = "True iris class"
+y_lab     = "Predicted iris class"
+plot_dat %>% ggplot(aes(x = class_num, y = y_pred, colour = Correct)) +
   geom_jitter() +
   scale_x_discrete(labels = levels(nn_dat$class_label)) +
   scale_y_discrete(labels = levels(nn_dat$class_label)) +
   theme_bw() +
-  ggtitle(label = "Classification Performance of Artificial Neural Network",
-          subtitle = str_c("Accuracy = ", round(perf$acc, 3) * 100, "%")) +
-  xlab(label = "True iris class") +
-  ylab(label = "Predicted iris class")
+  labs(title = title, subtitle = sub_title, x = x_lab, y = y_lab)
 ```
 
 <img src="README_files/figure-markdown_github/conf_mat_vis-1.png" style="display: block; margin: auto;" />
 
 ### Conclusion
 
-I hope this little post illustrated how easy it is to get started building artificial neural network using Keras and TensorFlow in R. With relative ease, we created a 3-class predictor with an accuracy of 100% on an independent data set. This was a basic minimal example. The network can be expanded to create Deep Learning networks and furhtermore, the entire TensorFlow API is available.
+Here, we created a 3-class predictor with an accuracy of 100% on a left out data partition. I hope this little post illustrated how you can get started building artificial neural network using [Keras and TensorFlow in R](https://keras.rstudio.com/). This was a basic minimal example. It should be noted that the network can be expanded to create full deep Learning networks and furhtermore, the entire TensorFlow API is available. It also goes to show how important it is for a data scientist, that the tools needed to go effeciently from idea to implementation is available - Available and accessible technology is the cornerstone of modern data science.
 
 Enjoy and Happy Learning!
 
